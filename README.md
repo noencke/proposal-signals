@@ -301,7 +301,7 @@ namespace Signal {
 
 A Signal represents a cell of data which may change over time. Signals may be either "state" (just a value which is set manually) or "computed" (a formula based on other Signals).
 
-Computed Signals work by automatically tracking which other Signals are read during their evaluation. When a computed is read, it checks whether any of its previously recorded dependencies have changed, and re-evaluates itself if so. When multiple computed Signals are nested, all of the attribution of the tracking goes to the innermost one.
+Computed Signals work by automatically tracking which other Signals are read during their evaluation. When a computed signal is read, it checks whether any of its previously recorded dependencies have changed, and re-evaluates itself if so. When multiple computed Signals are nested, all of the attribution of the tracking goes to the innermost one.
 
 Computed Signals are lazy, i.e., pull-based: they are only re-evaluated when they are accessed, even if one of their dependencies changed earlier.
 
@@ -320,18 +320,18 @@ Like Promises, Signals can represent an error state: If a computed Signal's call
 
 ### Understanding the Signal class
 
-A `Signal` instance represents the capability to read a dynamically changing value whose updates are tracked over time. It also implicitly includes the capability to subscribe to the Signal, implicitly through a tracked access from another computed Signal.
+A `Signal` instance represents the capability to read a dynamically changing value whose updates are tracked over time. It also includes the capability to subscribe to the Signal implicitly through a tracked access from another computed Signal.
 
 The API here is designed to match the very rough ecosystem consensus among a large fraction of Signal libraries in the use of names like "signal", "computed" and "state". However, access to Computed and State Signals is through a `.get()` method, which disagrees with all popular Signal APIs, which either use a `.value`-style accessor, or `signal()` call syntax.
 
 The API is designed to reduce the number of allocations, to make Signals suitable for embedding in JavaScript frameworks while reaching same or better performance than existing framework-customized Signals. This implies:
 - State Signals are a single writable object, which can be both accessed and set from the same reference. (See implications below in the "Capability separation" section.)
 - Both State and Computed Signals are designed to be subclassable, to facilitate frameworks' ability to add additional properties through public and private class fields (as well as methods for using that state).
-- Various callbacks (e.g., `equals`, the computed callback) are called with the relevant Signal as the `this` value for context, so that a new closure isn't needed per Signal. Instead, context can be saved in extra properties of the signal itself.
+- Various callbacks (e.g., `equals`, the computed callback) are called with the relevant Signal as the `this` value for context, so that a new closure isn't needed per Signal. Instead, context can be saved in extra properties of the Signal itself.
 
 Some error conditions enforced by this API:
-- It is an error to read a computed recursively.
-- The `notify` callback of a Watcher cannot read or write any signals
+- It is an error to read a computed Signal recursively.
+- The `notify` callback of a Watcher cannot read or write any signals.
 - If a computed Signal's callback throws, then subsequent accesses of the Signal rethrow that cached error, until one of the dependencies changes and it is recalculated.
 
 Some conditions which are *not* enforced:
@@ -426,7 +426,7 @@ Before proposing for Stage 2, we plan to:
 This section describes each of the APIs exposed to JavaScript, in terms of the algorithms that they implement. This can be thought of as a proto-specification, and is included at this early point to nail down one possible set of semantics, while being very open to changes.
 
 Some aspects of the algorithm:
-- The order of reads of Signals within a computed is significant, and is observable in the order that certain callbacks (which `Watcher` is invoked, `equals`, the first parameter to `new Signal.Computed`, and the `watched`/`unwatched` callbacks) are executed. This means that the sources of a computed Signal must be stored ordered.
+- The order of reads of Signals within a computed Signal is significant, and is observable in the order that certain callbacks (which `Watcher` is invoked, `equals`, the first parameter to `new Signal.Computed`, and the `watched`/`unwatched` callbacks) are executed. This means that the sources of a computed Signal must be stored ordered.
 - These four callbacks might all throw exceptions, and these exceptions are propagated in a predictable manner to the calling JS code. The exceptions do *not* halt execution of this algorithm or leave the graph in a half-processed state. For errors thrown in the `notify` callback of a Watcher, that exception is sent to the `.set()` call which triggered it, using an AggregateError if multiple exceptions were thrown. The others (including `watched`/`unwatched`?) are stored in the value of the Signal, to be rethrown when read, and such a rethrowing Signal can be marked `~clean~` just like any other with a normal value.
 - Care is taken to avoid circularities in cases of computed signals which are not "watched" (being observed by any Watcher), so that they can be garbage collected independently from other parts of the signal graph. Internally, this can be implemented with a system of generation numbers which are always collected; note that optimized implementations may also include local per-node generation numbers, or avoid tracking some numbers on watched signals.
 
